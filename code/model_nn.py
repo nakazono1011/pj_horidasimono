@@ -1,41 +1,46 @@
 from util import Util
-from sklearn.model_selection import KFold
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_squared_log_error, r2_score
 from sklearn.feature_extraction.text import TfidfVectorizer as Tfidf
-from sklearn.pipeline import make_pipeline, make_union, Pipeline
-from sklearn.preprocessing import FunctionTransformer, StandardScaler
-from sklearn.metrics import mean_squared_log_error
-from sklearn.model_selection import KFold, train_test_split
-from sklearn.feature_extraction import DictVectorizer
-from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
-from sklearn.metrics import mean_squared_log_error, r2_score
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import StandardScaler
 
 import warnings
 warnings.simplefilter("ignore")
 
 from keras.callbacks import EarlyStopping
-from keras.layers.advanced_activations import PReLU
+from keras.layers.advanced_activations import PReLU, ReLU
 from keras.layers.core import Activation, Dense, Dropout
 from keras.layers.normalization import BatchNormalization
 from keras.models import Sequential, load_model
 from keras.utils import np_utils
+from keras import backend as K
 
 import numpy as np
 
+def root_mean_squared_error(y_true, y_pred):
+    return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1)) 
+
+
 class ModelNN():
     
-    def __init__(self, vectorizer, run_name="NN"):
+    def __init__(self, params, vectorizer, run_name="NN"):
         self.run_name = run_name
-        self.params = {
-                      }
+        self.params = params
         self.model = None
-        self.vectorizer = vectorizer
 
     def fit(self, tr_x, tr_y, va_x=None, va_y=None):
-        tr_x = self.vectorizer.fit_transform(tr_x).astype(np.float32)
-        
+
+        # パラメータ
+        input_dropout = self.params['input_dropout']
+        hidden_layers = int(self.params['hidden_layers'])
+        hidden_units = int(self.params['hidden_units'])
+        hidden_activation = self.params['hidden_activation']
+        hidden_dropout = self.params['hidden_dropout']
+        batch_norm = self.params['batch_norm']
+        optimizer_type = self.params['optimizer']['type']
+        optimizer_lr = self.params['optimizer']['lr']
+        batch_size = int(self.params['batch_size'])
+
+        #ベクトライズ・標準化
         y_scaler   = StandardScaler() 
         tr_y_std = y_scaler.fit_transform(np.log1p(tr_y.values.reshape(-1, 1)))
 
@@ -46,39 +51,50 @@ class ModelNN():
             va_y_std = y_scaler.transform(np.log1p(va_y.values.reshape(-1, 1)))
 
         # モデルの構築
-        model = Sequential()
-        model.add(Dense(512, activation='relu' ,input_shape=(tr_x.shape[1],)))
-        model.add(BatchNormalization())
-        model.add(Dropout(0.5))
-        model.add(Dense(256, activation='relu'))
-        model.add(BatchNormalization())
-        model.add(Dropout(0.5))
-        model.add(Dense(256, activation='relu'))
-        model.add(BatchNormalization())
-        model.add(Dropout(0.5))
-        model.add(Dense(256, activation='relu'))
-        model.add(BatchNormalization())
-        model.add(Dropout(0.5))
-        model.add(Dense(128, activation='relu'))
-        model.add(BatchNormalization())
-        model.add(Dropout(0.5))
-        model.add(Dense(1, activation="linear"))
-        model.compile(loss='mean_squared_error', optimizer='adam')
+        # 入力層
+        self.model = Sequential()
+        self.model.add(Dense(512, input_shape=(tr_x.shape[1],)))
+        self.model.add(PReLU())
+        self.model.add(Dropout(input_dropout))
+
+        # 中間層
+        for i in range(hidden_layers):
+            self.model.add(Dense(hidden_units))
+            if batch_norm == 'before_act':
+                self.model.add(BatchNormalization())
+            if hidden_activation == 'prelu':
+                self.model.add(PReLU())
+            elif hidden_activation == 'relu':
+                self.model.add(ReLU())
+            else:
+                raise NotImplementedError
+            self.model.add(Dropout(hidden_dropout))
+        
+        self.model.add(Dense(1, activation="linear"))
+
+        # オプティマイザ
+        if optimizer_type == 'sgd':
+            optimizer = SGD(lr=optimizer_lr, decay=1e-6, momentum=0.9, nesterov=True)
+        elif optimizer_type == 'adam':
+            optimizer = Adam(lr=optimizer_lr, beta_1=0.9, beta_2=0.999, decay=0.)
+        else:
+            raise NotImplementedError
+
+        # 目的関数、評価指標などの設定    
+        self.model.compile(loss=root_mean_squared_error, optimizer=optimizer)
 
         if validation:
             early_stopping = EarlyStopping(monitor='val_loss', patience=5,
                                            verbose=1, restore_best_weights=True)
-            model.fit(tr_x, tr_y_std, epochs=200, batch_size=512, verbose=1,
+            self.model.fit(tr_x, tr_y_std, epochs=200, batch_size=64, verbose=2,
                       validation_data=(va_x, va_y_std), callbacks=[early_stopping])
         else:
-            model.fit(tr_x, tr_y_std, epochs=200, batch_size=512, verbose=1)
+            self.model.fit(tr_x, tr_y_std, epochs=200, batch_size=64, verbose=2)
 
         # モデル・スケーラーの保持
-        self.model = model
         self.scaler = y_scaler
 
     def predict(self, te_x):
-        te_x = self.vectorizer.transform(te_x)
         pred = self.model.predict(te_x).reshape(-1,1)
         pred = self.scaler.inverse_transform(pred)[:,0]
         return pred
