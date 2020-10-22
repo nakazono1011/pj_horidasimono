@@ -13,18 +13,48 @@ from keras.layers.normalization import BatchNormalization
 from keras.models import Sequential, load_model
 from keras.utils import np_utils
 from keras import backend as K
+from keras.optimizers import SGD, Adam
 
 import numpy as np
+
+"""
+# 探索するパラメータの空間を指定する
+param_space = {
+    'input_dropout': hp.quniform('input_dropout', 0, 0.2, 0.05),
+    'hidden_layers': hp.quniform('hidden_layers', 2, 4, 1),
+    'hidden_units': hp.quniform('hidden_units', 32, 256, 32),
+    'hidden_activation': hp.choice('hidden_activation', ['prelu', 'relu']),
+    'hidden_dropout': hp.quniform('hidden_dropout', 0, 0.3, 0.05),
+    'batch_norm': hp.choice('batch_norm', ['before_act', 'no']),
+    'optimizer': hp.choice('optimizer',
+                           [{'type': 'adam',
+                             'lr': hp.loguniform('adam_lr', np.log(0.00001), np.log(0.01))},
+                            {'type': 'sgd',
+                             'lr': hp.loguniform('sgd_lr', np.log(0.00001), np.log(0.01))}]),
+    'batch_size': hp.quniform('batch_size', 32, 128, 32),
+}
+"""
 
 def root_mean_squared_error(y_true, y_pred):
     return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1)) 
 
-
 class ModelNN():
     
-    def __init__(self, params, vectorizer, run_name="NN"):
+    def __init__(self, params, run_name="NN"):
         self.run_name = run_name
-        self.params = params
+        if params is None:
+            self.params = {
+                            'input_dropout': 0.0,
+                            'hidden_layers': 3,
+                            'hidden_units': 96,
+                            'hidden_activation': 'relu',
+                            'hidden_dropout': 0.2,
+                            'batch_norm': 'before_act',
+                            'optimizer': {'type': 'adam', 'lr': 0.001},
+                            'batch_size': 64,
+                          }
+        else:
+            self.params = params
         self.model = None
 
     def fit(self, tr_x, tr_y, va_x=None, va_y=None):
@@ -40,14 +70,13 @@ class ModelNN():
         optimizer_lr = self.params['optimizer']['lr']
         batch_size = int(self.params['batch_size'])
 
-        #ベクトライズ・標準化
+        #標準化
         y_scaler   = StandardScaler() 
         tr_y_std = y_scaler.fit_transform(np.log1p(tr_y.values.reshape(-1, 1)))
 
         # データのセット・スケーリング
         validation = va_x is not None
         if validation:
-            va_x = self.vectorizer.transform(va_x).astype(np.float32)
             va_y_std = y_scaler.transform(np.log1p(va_y.values.reshape(-1, 1)))
 
         # モデルの構築
@@ -86,10 +115,10 @@ class ModelNN():
         if validation:
             early_stopping = EarlyStopping(monitor='val_loss', patience=5,
                                            verbose=1, restore_best_weights=True)
-            self.model.fit(tr_x, tr_y_std, epochs=200, batch_size=64, verbose=2,
+            self.model.fit(tr_x, tr_y_std, epochs=200, batch_size=64, verbose=1,
                       validation_data=(va_x, va_y_std), callbacks=[early_stopping])
         else:
-            self.model.fit(tr_x, tr_y_std, epochs=200, batch_size=64, verbose=2)
+            self.model.fit(tr_x, tr_y_std, epochs=200, batch_size=64, verbose=1)
 
         # モデル・スケーラーの保持
         self.scaler = y_scaler
