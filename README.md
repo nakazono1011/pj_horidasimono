@@ -4,6 +4,7 @@
 
 # DEMO
 
+![スクリーンショット 2020-10-30 165600](https://user-images.githubusercontent.com/66734196/97674525-05a33080-1ad1-11eb-8710-92b68c1e32c6.png)
 
 # Features
 
@@ -45,12 +46,11 @@ pip install mojimoji
 
 # Usage
 
-DEMOの実行方法など、"hoge"の基本的な使い方を説明する
+app.py を実行することでサーバーが起動します
 
 ```bash
-git clone https://github.com/hoge/~
-cd examples
-python demo.py
+cd webapp
+python app.py
 ```
 
 # Note
@@ -59,10 +59,8 @@ python demo.py
 
 # Author
 
-作成情報を列挙する
-
-* Name: Keisuke Nakazono
-* mail-address: k.nakazono1011@gmail.com
+* 作成者: Keisuke Nakazono
+* メールアドレス: k.nakazono1011@gmail.com
 
 # License
 ライセンスを明示する
