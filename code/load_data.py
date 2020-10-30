@@ -3,7 +3,7 @@ import pandas as pd
 from google.cloud import storage
 
 #環境変数
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "../auth/My First Project.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "../auth/credential.json"
 
 def load_data_from_gcs(bucket_name="pj_horidasimono", prefix="dataset/train/ElectricalAppliance"):
     client = storage.Client()
