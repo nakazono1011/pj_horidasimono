@@ -1,8 +1,14 @@
-# Horidasu
+# 個人プロジェクト「Horidasu」
 
 個人プロジェクト「フリマ掘り出し物発掘AI」のレポジトリです。
 
+課題設定の背景や実装手法や結果・考察などはこちらのスライドにまとめております。
+https://www.slideshare.net/KeisukeNakazono/dic-239191343
+
 # DEMO
+
+黄色いラベルはモデルが予測した価格
+黒いラベルは実際にフリマに出品されている価格
 
 ![スクリーンショット 2020-10-30 165600](https://user-images.githubusercontent.com/66734196/97674525-05a33080-1ad1-11eb-8710-92b68c1e32c6.png)
 
